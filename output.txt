@@ -1,0 +1,136 @@
+Archivo: C:\Users\SebaHero\Desktop\SalchiWEB\BACKEND\config\database.php
+Código:
+<?php
+// Cargar las variables de entorno desde el archivo .env
+require_once __DIR__ . '/vendor/autoload.php';
+Dotenv\Dotenv::createImmutable(__DIR__)->load();
+
+class Database
+{
+    private $host;
+    private $db_name;
+    private $username;
+    private $password;
+    private $conn;
+
+    public function __construct()
+    {
+        // Leer las variables de entorno
+        $this->host = $_ENV['DB_HOST'];
+        $this->db_name = $_ENV['DB_NAME'];
+        $this->username = $_ENV['DB_USER'];
+        $this->password = $_ENV['DB_PASSWORD'];
+    }
+
+    public function getConnection()
+    {
+        $this->conn = null;
+
+        try {
+            // Establecer conexión con la base de datos utilizando PDO
+            $this->conn = new PDO(
+                "mysql:host=" . $this->host . ";dbname=" . $this->db_name,
+                $this->username,
+                $this->password,
+                array(PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES utf8mb4")
+            );
+            $this->conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        } catch (PDOException $e) {
+            echo "Connection error: " . $e->getMessage();
+        }
+
+        return $this->conn;
+    }
+}
+?>
+
+
+Archivo: C:\Users\SebaHero\Desktop\SalchiWEB\BACKEND\router.php
+Código:
+<?php
+require_once __DIR__ . '/config/Database.php';
+require_once __DIR__ . '/controllers/AuthController.php';
+
+class Router {
+    private $authController;
+
+    public function __construct() {
+        $this->authController = new AuthController();
+    }
+
+    public function handleRequest() {
+        $method = $_SERVER['REQUEST_METHOD'];
+        $path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+
+        if ($method === 'OPTIONS') {
+            header('Access-Control-Allow-Origin: http://localhost:5173');
+            header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
+            header('Access-Control-Allow-Headers: Content-Type, Authorization');
+            header('Access-Control-Max-Age: 86400');
+            exit(0);
+        }
+
+        switch ($path) {
+            case '/register':
+                if ($method === 'POST') {
+                    $data = json_decode(file_get_contents('php://input'), true);
+                    echo json_encode($this->authController->register($data));
+                } else {
+                    $this->methodNotAllowed();
+                }
+                break;
+            case '/login':
+                if ($method === 'POST') {
+                    $data = json_decode(file_get_contents('php://input'), true);
+                    echo json_encode($this->authController->login($data));
+                } else {
+                    $this->methodNotAllowed();
+                }
+                break;
+            default:
+                $this->notFound();
+                break;
+        }
+    }
+
+    private function notFound() {
+        http_response_code(404);
+        echo json_encode(['success' => false, 'message' => 'Not Found']);
+    }
+
+    private function methodNotAllowed() {
+        http_response_code(405);
+        echo json_encode(['success' => false, 'message' => 'Method Not Allowed']);
+    }
+}
+
+
+
+Archivo: C:\Users\SebaHero\Desktop\SalchiWEB\BACKEND\server.php
+Código:
+<?php
+require_once __DIR__ . '/vendor/autoload.php';
+
+$dotenv = Dotenv\Dotenv::createImmutable(__DIR__);
+$dotenv->load();
+
+// Set CORS headers
+header('Access-Control-Allow-Origin: http://localhost:5173');
+header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Authorization');
+
+// Handle preflight requests
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    header('HTTP/1.1 200 OK');
+    exit();
+}
+
+header('Content-Type: application/json');
+
+require_once 'router.php';
+
+$router = new Router();
+$router->handleRequest();
+
+
+
